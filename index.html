@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>指定路線チェッカー</title>
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">誘</span><div><b>指定路線チェッカー</b><small>関西2府4県・検定合格警備員配置路線</small></div></div>
+  <button id="btnMenu" class="icon" aria-label="メニュー">☰</button>
+</header>
+
+<section class="search">
+  <form id="f">
+    <input id="q" type="search" placeholder="住所を入力（例：大阪市北区梅田1-1）" autocomplete="off" enterkeyhint="search">
+    <button type="submit" class="primary">判定</button>
+  </form>
+  <div class="row">
+    <button id="btnGps" class="chip">📍 現在地</button>
+    <span class="hint">地図をタップしても判定できます</span>
+    <label class="th">接道距離
+      <select id="th"><option value="20">20m</option><option value="30" selected>30m</option><option value="50">50m</option></select>
+    </label>
+  </div>
+</section>
+
+<div id="map"></div>
+
+<section id="result" class="result hidden" aria-live="polite"></section>
+
+<div id="drawer" class="drawer hidden">
+  <div class="drawer-in">
+    <div class="drawer-h"><b>メニュー</b><button id="btnClose" class="icon">✕</button></div>
+    <div class="tabs"><button data-t="list" class="on">路線一覧</button><button data-t="offline">オフライン</button><button data-t="about">使い方・注意</button></div>
+    <div id="t-list" class="tab"></div>
+    <div id="t-offline" class="tab hidden">
+      <p>全エリアの路線・建物データ（約21MB）を端末に保存すると、電波がなくても判定できます。</p>
+      <button id="btnDl" class="primary wide">オフライン用データを保存</button>
+      <div class="bar"><div id="dlBar"></div></div><p id="dlMsg" class="muted"></p>
+      <p class="muted">※背景地図は表示したエリアだけ自動保存されます。住所検索はオフライン時、町丁目レベルで位置を出します（建物は地図タップで選択）。</p>
+    </div>
+    <div id="t-about" class="tab hidden">
+      <h4>判定のしかた</h4>
+      <ol><li>住所を入れるか、地図をタップ／現在地</li><li>建物の外周から指定距離内に認定路線の中心線があれば「該当」</li><li>建物のどの面（北・東など）が路線に面しているかを表示</li></ol>
+      <h4>表示の意味</h4>
+      <p><span class="badge ok">該当</span> 認定路線に接道<br><span class="badge warn">要確認</span> 区間指定の端付近・データ精度に注意<br><span class="badge ng">非該当</span> 指定距離内に認定路線なし</p>
+      <h4>注意</h4>
+      <p class="muted">本アプリは各府県公安委員会告示をもとに作成した参考ツールです。地図データ（OpenStreetMap）や区間端の推定には誤差があります。最終判断は必ず最新の告示・所轄警察署でご確認ください。</p>
+      <p class="muted">地図データ © OpenStreetMap contributors / 背景地図 国土地理院 / 住所検索 国土地理院・Geolonia 住所データ</p>
+      <p class="muted" id="ver"></p>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast hidden"></div>
+<script src="vendor/leaflet.js"></script>
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
