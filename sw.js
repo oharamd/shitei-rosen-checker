@@ -1,7 +1,7 @@
-const SHELL='rosen-shell-v1', DATA='rosen-data-v1', TILE='rosen-tile-v1';
+const SHELL='rosen-shell-v2', DATA='rosen-data-v2', TILE='rosen-tile-v1';
 const ASSETS=['./','index.html','style.css','core.js','app.js','manifest.json','vendor/leaflet.js','vendor/leaflet.css','data/routes.json','data/addr.json','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(SHELL).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
-self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim())});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>![SHELL,DATA,TILE].includes(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
   const u=new URL(e.request.url);
   if(u.hostname==='cyberjapandata.gsi.go.jp'){ // 地図タイル：キャッシュ優先＋表示した分を保存

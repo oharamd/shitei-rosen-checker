@@ -55,32 +55,67 @@
       }
     } else samples.push({ p: p0, n: null });
     let R = 0; for (const s of samples) R = Math.max(R, Math.hypot(s.p[0], s.p[1]));
-    const reach = R + th, nearR = Math.max(150, R + 120);
-    const hits = new Map(), nears = new Map();
+    const routes = META.routes;
+    // 道路の片側幅（中心線→道路端）の目安：建物から道路端までを判定距離で測る
+    const halfW = r => r.id === 'MW' ? 12 : /^国道/.test(r.name) ? 10 : /^主要地方道/.test(r.name) ? 8 : /^(府道|県道)/.test(r.name) ? 6 : 4;
+    const reach = R + th + 12, nearR = Math.max(150, R + 120);
+    // 間に別の建物がある場合は「接道していない」とみなすための障害物（周辺建物の辺）
+    const obst = [];
+    for (const b of data.blds) {
+      if (b === bld) continue;
+      const xy = b.map(P.f); let ok = false;
+      for (const q of xy) if (Math.abs(q[0]) < reach && Math.abs(q[1]) < reach) { ok = true; break; }
+      if (!ok || (!bld && pip(p0, xy))) continue;
+      for (let i = 0; i < xy.length; i++) { const u = xy[i], v = xy[(i + 1) % xy.length]; obst.push([u[0], u[1], v[0], v[1], Math.min(u[0], v[0]), Math.max(u[0], v[0]), Math.min(u[1], v[1]), Math.max(u[1], v[1])]); }
+    }
+    const cross = (p, q) => {
+      const x0 = Math.min(p[0], q[0]), x1 = Math.max(p[0], q[0]), y0 = Math.min(p[1], q[1]), y1 = Math.max(p[1], q[1]);
+      for (const e of obst) {
+        if (e[5] < x0 || e[4] > x1 || e[7] < y0 || e[6] > y1) continue;
+        const d1 = (q[0] - p[0]) * (e[1] - p[1]) - (q[1] - p[1]) * (e[0] - p[0]), d2 = (q[0] - p[0]) * (e[3] - p[1]) - (q[1] - p[1]) * (e[2] - p[0]);
+        const d3 = (e[2] - e[0]) * (p[1] - e[1]) - (e[3] - e[1]) * (p[0] - e[0]), d4 = (e[2] - e[0]) * (q[1] - e[1]) - (e[3] - e[1]) * (q[0] - e[0]);
+        if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+      }
+      return false;
+    };
+    const cand = new Map(), nears = new Map();
     for (const rd of data.roads) {
-      const xy = rd.pts.map(P.f);
+      const r = routes[rd.ri], lim = th + halfW(r), xy = rd.pts.map(P.f);
       for (let i = 0; i < xy.length - 1; i++) {
         const a = xy[i], b = xy[i + 1];
         const c0 = near(p0, a, b), d0 = dist(p0, c0);
         if (d0 > nearR + R) continue;
-        // 近くの路線（参考）
         const nn = nears.get(rd.ri); if (!nn || d0 < nn.d) nears.set(rd.ri, { d: d0, pt: P.inv(c0) });
-        if (d0 > reach) continue;
+        if (d0 > R + lim) continue;
         for (const s of samples) {
           const c = near(s.p, a, b), d = dist(s.p, c);
-          if (d > th) continue;
+          if (d > lim) continue;
           let o;
           if (s.n) {
             if (d > 0.5) { const vx = (c[0] - s.p[0]) / d, vy = (c[1] - s.p[1]) / d; if (vx * s.n[0] + vy * s.n[1] < 0.35) continue; }
             o = octant(s.n[0], s.n[1]);
-          } else o = d > 0.5 ? octant(c[0] - s.p[0], c[1] - s.p[1]) : -1;
-          let h = hits.get(rd.ri); if (!h) { h = { ri: rd.ri, sides: {}, dmin: Infinity }; hits.set(rd.ri, h); }
-          if (o >= 0 && (h.sides[o] === undefined || d < h.sides[o].d)) h.sides[o] = { d, from: P.inv(s.p), to: P.inv(c) };
-          if (d < h.dmin) { h.dmin = d; h.from = P.inv(s.p); h.to = P.inv(c); }
+          } else o = d > 0.5 ? octant(c[0] - s.p[0], c[1] - s.p[1]) : 0;
+          const k = rd.ri + ':' + o; let L = cand.get(k); if (!L) cand.set(k, L = []);
+          L.push({ ri: rd.ri, o, d, sp: s.p, c, edge: Math.max(0, d - halfW(r)) });
         }
       }
     }
-    const routes = META.routes;
+    const hits = new Map();
+    for (const L of cand.values()) {
+      L.sort((x, y) => x.d - y.d);
+      const step = Math.max(1, Math.floor(L.length / 40));
+      for (let i = 0; i < L.length; i += (i < 10 ? 1 : step)) {
+        const c = L[i];
+        // 道路端の手前までの線で遮りを確認（中央分離帯の建物等は無視）
+        const t = c.d > 0.5 ? Math.max(0, (c.d - halfW(routes[c.ri])) / c.d) : 0;
+        const q = [c.sp[0] + (c.c[0] - c.sp[0]) * t, c.sp[1] + (c.c[1] - c.sp[1]) * t];
+        if (t > 0 && cross(c.sp, q)) continue;
+        let h = hits.get(c.ri); if (!h) { h = { ri: c.ri, sides: {}, dmin: Infinity, emin: Infinity }; hits.set(c.ri, h); }
+        if (samples[0].n || c.d > 0.5) h.sides[c.o] = { d: c.d, from: P.inv(c.sp), to: P.inv(c.c) };
+        if (c.d < h.dmin) { h.dmin = c.d; h.emin = c.edge; h.from = P.inv(c.sp); h.to = P.inv(c.c); }
+        break;
+      }
+    }
     const hitList = [...hits.values()].map(h => {
       const r = routes[h.ri];
       let warn = null;
