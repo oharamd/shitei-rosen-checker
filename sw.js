@@ -1,4 +1,4 @@
-const SHELL='rosen-shell-v5', DATA='rosen-data-v2', TILE='rosen-tile-v1';
+const SHELL='rosen-shell-v6', DATA='rosen-data-v2', TILE='rosen-tile-v1';
 const ASSETS=['./','index.html','style.css','core.js','app.js','manifest.json','vendor/leaflet.js','vendor/leaflet.css','data/routes.json','data/addr.json','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(SHELL).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>![SHELL,DATA,TILE].includes(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

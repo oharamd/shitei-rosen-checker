@@ -3,7 +3,11 @@
   --pri:#2563eb;--ok:#dc2626;--ok-bg:#fee2e2;--ng:#059669;--ng-bg:#d1fae5;--warn:#d97706;--warn-bg:#fef3c7;
   --sh:0 6px 24px rgba(15,23,42,.18),0 1px 3px rgba(15,23,42,.12);--r:18px
 }
-@media (prefers-color-scheme:dark){:root{--glass:rgba(17,24,39,.9);--card:#111827;--ink:#e5e7eb;--sub:#94a3b8;--line:rgba(255,255,255,.08);--ok-bg:#450a0a;--ng-bg:#052e16;--warn-bg:#422006}}
+:root{--ui:1}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--glass:rgba(17,24,39,.9);--card:#111827;--ink:#e5e7eb;--sub:#94a3b8;--line:rgba(255,255,255,.08);--ok-bg:#450a0a;--ng-bg:#052e16;--warn-bg:#422006}
+:root:not([data-theme="light"]) .leaflet-tile-pane{filter:invert(.92) hue-rotate(180deg) brightness(.9) contrast(.9)}}
+:root[data-theme="dark"]{--glass:rgba(17,24,39,.9);--card:#111827;--ink:#e5e7eb;--sub:#94a3b8;--line:rgba(255,255,255,.08);--ok-bg:#450a0a;--ng-bg:#052e16;--warn-bg:#422006}
+:root[data-theme="dark"] .leaflet-tile-pane{filter:invert(.92) hue-rotate(180deg) brightness(.9) contrast(.9)}
 *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}
 body{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;color:var(--ink);background:#e5e7eb;-webkit-tap-highlight-color:transparent}
 button,select,input{font:inherit;color:inherit}
@@ -85,3 +89,27 @@ button,select,input{font:inherit;color:inherit}
 .rlabel.w{background:#d97706}
 .leaflet-div-icon{background:transparent;border:0}
 .tog{cursor:pointer;user-select:none}.tog input{margin:0;width:16px;height:16px;accent-color:#7c3aed}.tog:has(input:checked){color:var(--ink);font-weight:700}
+
+/* 文字サイズ（UI部分のみ拡大） */
+.topbar,.sheet,.drawer-in,.toast{zoom:var(--ui)}
+/* 入力候補 */
+.sug{pointer-events:auto;list-style:none;margin:6px 0 0;padding:4px;max-width:560px;background:var(--card);border-radius:14px;box-shadow:var(--sh);max-height:50vh;overflow:auto}
+.sug li{padding:10px 12px;border-radius:10px;font-size:14px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.sug li.on,.sug li:hover{background:rgba(37,99,235,.1)}
+.sug li.sh{font-size:11px;color:var(--sub);cursor:default;padding:6px 12px 2px}
+.sug .badge{font-size:10px;margin-left:auto}
+/* お知らせ */
+.notice{pointer-events:auto;position:relative;margin-top:8px;max-width:560px;background:#1d4ed8;color:#fff;border-radius:14px;padding:10px 36px 10px 12px;font-size:13px;box-shadow:var(--sh)}
+.notice ul{margin:4px 0 0;padding-left:18px}.notice .nx{position:absolute;right:6px;top:6px;border:0;background:transparent;color:#fff;font-size:16px;cursor:pointer}
+/* 履歴 */
+.hrow{display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0}
+.star{border:0;background:transparent;font-size:20px;color:#f59e0b;cursor:pointer;padding:0 4px}
+.hmain{flex:1;min-width:0;cursor:pointer}.ht{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hs{font-size:12px;color:var(--sub);display:flex;gap:6px;align-items:center}.hd{margin-left:auto}
+.acts{display:flex;gap:8px;padding-top:6px}
+.plain{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:7px 14px;font-size:13px;cursor:pointer}
+.plain.on{color:#f59e0b;border-color:#f59e0b}
+.seg{display:flex;background:rgba(148,163,184,.15);padding:4px;border-radius:12px;gap:4px;margin-bottom:8px}
+.seg button{flex:1;border:0;background:transparent;color:var(--ink);padding:8px;border-radius:9px;cursor:pointer}
+.seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.15);font-weight:700}
+.tabs button{font-size:13px;padding:8px 2px}
