@@ -86,7 +86,7 @@
         const c0 = near(p0, a, b), d0 = dist(p0, c0);
         if (d0 > nearR + R) continue;
         const nn = nears.get(rd.ri); if (!nn || d0 < nn.d) nears.set(rd.ri, { d: d0, pt: P.inv(c0) });
-        if (d0 > R + lim) continue;
+        if (d0 > R + lim || (r.id === 'MW' && !opt.mw)) continue;
         for (const s of samples) {
           const c = near(s.p, a, b), d = dist(s.p, c);
           if (d > lim) continue;
@@ -130,7 +130,7 @@
     const nearList = [...nears.entries()].filter(([ri]) => !hits.has(ri)).map(([ri, v]) => ({ ri, route: routes[ri], d: v.d, pt: v.pt })).sort((a, b) => a.d - b.d).slice(0, 4);
     let verdict = 'ng';
     if (hitList.length) verdict = hitList.some(h => !h.warn) ? 'ok' : 'warn';
-    else if (nearList.some(n => n.d <= th + 15)) verdict = 'warn';
+    else if (nearList.some(n => n.d <= th + 15 && (n.route.id !== 'MW' || opt.mw))) verdict = 'warn';
     return { verdict, building: bld, hits: hitList, near: nearList, th };
   };
 

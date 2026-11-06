@@ -2,7 +2,7 @@
   const $ = s => document.querySelector(s);
   const C = window.Core;
   const cellCache = new Map(), bundleCache = new Map();
-  let ADDR = null, map, layer, roadLayer, drawnCells = new Set(), last = null;
+  let ADDR = null, map, layer, roadLayer, mwLayer, drawnCells = new Set(), last = null, showMw = false;
   const toast = (m, ms = 2500) => { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), ms); };
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -13,7 +13,7 @@
     $('#ver').textContent = `データ作成日 ${meta.built} ／ 路線数 ${meta.routes.length - 1}`;
     map = L.map('map', { zoomControl: false, attributionControl: true }).setView([34.69, 135.5], 11);
     L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', { maxZoom: 19, maxNativeZoom: 18, attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a> | © OpenStreetMap contributors' }).addTo(map);
-    roadLayer = L.layerGroup().addTo(map); layer = L.layerGroup().addTo(map);
+    roadLayer = L.layerGroup().addTo(map); mwLayer = L.layerGroup(); layer = L.layerGroup().addTo(map);
     map.on('click', e => run([e.latlng.lng, e.latlng.lat], '地図で選択した地点'));
     map.on('moveend', drawRoads);
     buildList(meta);
@@ -40,7 +40,7 @@
   }
   const colorOf = r => r.id === 'MW' ? '#7c3aed' : (r.note && !r.group ? '#f59e0b' : '#ef4444');
   async function drawRoads() {
-    if (map.getZoom() < 13) { roadLayer.clearLayers(); drawnCells.clear(); return; }
+    if (map.getZoom() < 13) { roadLayer.clearLayers(); mwLayer.clearLayers(); drawnCells.clear(); return; }
     const b = map.getBounds(), cs = C.meta().cell, keys = [];
     for (let x = Math.floor(b.getWest() / cs); x <= Math.floor(b.getEast() / cs); x++)
       for (let y = Math.floor(b.getSouth() / cs); y <= Math.floor(b.getNorth() / cs); y++) keys.push(`${x}_${y}`);
@@ -49,7 +49,7 @@
       if (drawnCells.has(k)) continue; drawnCells.add(k);
       try {
         const d = await getCell(k);
-        for (const r of d.roads) { const m = C.meta().routes[r.ri]; L.polyline(r.pts.map(p => [p[1], p[0]]), { color: colorOf(m), weight: 5, opacity: .5, interactive: false }).addTo(roadLayer); }
+        for (const r of d.roads) { const m = C.meta().routes[r.ri]; L.polyline(r.pts.map(p => [p[1], p[0]]), { color: colorOf(m), weight: m.id === 'MW' ? 4 : 5, opacity: m.id === 'MW' ? .45 : .5, interactive: false }).addTo(m.id === 'MW' ? mwLayer : roadLayer); }
       } catch (e) { drawnCells.delete(k); }
     }
   }
@@ -74,7 +74,7 @@
     setPeek('<div class="hint">判定中…</div>', false);
     let data;
     try { data = await loadAround(pt[0], pt[1]); } catch (e) { setPeek(`<div class="hint">${esc(e.message)}</div>`, false); return; }
-    const r = C.judge(pt, data, { th });
+    const r = C.judge(pt, data, { th, mw: showMw });
     render(r, title, level);
     draw(r, pt);
   }
@@ -107,7 +107,7 @@
     const base = r.building ? '建物' : '地点';
     let chips;
     if (r.hits.length) chips = `<div class="rchips">${r.hits.map(h => `<span class="rc ${h.warn ? 'w' : ''}"><b>${esc(shortDir(h.dirs))}</b>${esc(h.route.name.replace(/^主要地方道|^(府|県)道/, ''))}</span>`).join('')}</div>`;
-    else chips = `<div class="ngtxt">${r.near.length ? `最寄り：${esc(r.near[0].route.name)} 約${r.near[0].d.toFixed(0)}m` : `周辺に認定路線なし`}</div>`;
+    else chips = `<div class="ngtxt">${(n0 => n0 ? `最寄り：${esc(n0.route.name)} 約${n0.d.toFixed(0)}m` : `周辺に認定路線なし`)(r.near.find(n => n.route.id !== 'MW'))}</div>`;
     const lv = level && level !== '住所' ? `（${esc(level)}の位置）` : '';
     setPeek(`<div class="sum"><div class="vb ${r.verdict}">${lab}</div><div class="t"><div class="ad">${esc(title || '')}${lv}</div>${chips}</div></div>`, true);
 
@@ -119,7 +119,9 @@
         + (x.warn ? `<div class="note">⚠ ${esc(x.warn)}</div>` : '')
         + (x.route.group ? `<div class="meta">和歌山県警の認定路線図から取得（市道・町道・港湾道路）</div>` : x.route.sec.type !== 'all' ? `<div class="meta">区間：${esc(x.route.sec.text || (x.route.sec.munis || []).join('、'))}</div>` : '') + `</div></div>`;
     }
-    const nr = r.near.filter(n => n.d < 200);
+    const nr = r.near.filter(n => n.d < 200 && n.route.id !== 'MW');
+    const mw = r.near.find(n => n.route.id === 'MW' && n.d < 60);
+    if (mw) h += `<div class="foot">⚠ 約${mw.d.toFixed(0)}mに高速道路・自動車専用道路があります（高架下・側道の作業は現地確認）。上の「高速道路も表示・判定」にチェックで判定に含めます。</div>`;
     if (nr.length) h += `<div class="foot">近くの認定路線：${nr.map(n => `${esc(n.route.name)} 約${n.d.toFixed(0)}m`).join('／')}</div>`;
     if (level && level !== '住所') h += `<div class="foot">${esc(level)}レベルの位置です。対象の建物を地図でタップすると正確に判定できます。</div>`;
     h += `<div class="foot">${r.building ? '建物の外周' : '地点（建物データなし）'}から道路端まで${r.th}m以内・間に建物なしで「接道」。参考判定です。最終確認は最新の公安委員会告示で。</div>`;
@@ -180,5 +182,6 @@
   $('#drawer').addEventListener('click', e => { if (e.target.id === 'drawer') $('#drawer').classList.add('hidden'); });
   document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('hidden', t.id !== 't-' + b.dataset.t)); });
   $('#btnDl').onclick = downloadAll;
+  $('#chkMw').onchange = () => { showMw = $('#chkMw').checked; showMw ? mwLayer.addTo(map) : mwLayer.remove(); if (last) run(last.pt, last.title, last.level); };
   init().catch(e => toast('初期化エラー: ' + e.message, 6000));
 })();
