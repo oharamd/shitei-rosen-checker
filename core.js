@@ -122,7 +122,7 @@
       if (r.note && !r.group) warn = r.note;
       if (r.ends && r.ends.length) {
         const Q = proj(h.to[0], h.to[1]);
-        for (const e of r.ends) { if (dist([0, 0], Q.f(e.pt)) < Math.max(80, (e.d || 0) + 60)) { warn = '区間の始点・終点付近です（告示の区間を要確認）'; break; } }
+        for (const e of r.ends) { if ((e.d || 0) > 100 && dist([0, 0], Q.f(e.pt)) < e.d + 60) { warn = '区間の始点・終点付近です（告示の区間を要確認）'; break; } }
       }
       const sideIdx = Object.keys(h.sides).map(Number).sort((a, b) => a - b);
       return { ...h, route: r, warn, dirs: sideIdx.map(i => DIRS[i]), sideIdx };

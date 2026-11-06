@@ -2,6 +2,7 @@
   const $ = s => document.querySelector(s);
   const C = window.Core;
   const cellCache = new Map(), bundleCache = new Map();
+  const PATCH = fetch('data/patch.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
   let ADDR = null, map, layer, roadLayer, mwLayer, drawnCells = new Set(), last = null, showMw = false;
   const toast = (m, ms = 2500) => { const t = $('#toast'); t.textContent = m; t.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add('hidden'), ms); };
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -30,7 +31,11 @@
   async function getCell(k) {
     if (cellCache.has(k)) return cellCache.get(k);
     if (!C.meta().cells.includes(k)) return { roads: [], blds: [] };
-    const p = getBundle(bundleOf(k)).then(b => C.decode(k, b[k]));
+    const p = Promise.all([getBundle(bundleOf(k)), PATCH]).then(([b, pt]) => {
+      let raw = b[k];
+      if (pt[k]) raw = { r: pt[k].r, b: [...(raw ? raw.b : []), ...pt[k]['b+']] };
+      return raw ? C.decode(k, raw) : { roads: [], blds: [] };
+    });
     p.catch(() => cellCache.delete(k));
     cellCache.set(k, p); return p;
   }
@@ -158,7 +163,7 @@
   async function downloadAll() {
     const keys = C.meta().bundles; let done = 0; $('#btnDl').disabled = true;
     const cache = await caches.open('rosen-data-v2');
-    try { await cache.add('data/addr.json'); } catch (e) { }
+    try { await cache.add('data/addr.json'); await cache.add('data/patch.json'); } catch (e) { }
     const q = [...keys];
     const worker = async () => { while (q.length) { const k = q.shift(); try { await cache.add(`data/b/${k}.json`); } catch (e) { } done++; $('#dlBar').style.width = (done / keys.length * 100) + '%'; $('#dlMsg').textContent = `${done} / ${keys.length}`; } };
     await Promise.all([1, 2, 3, 4, 5, 6].map(worker));
