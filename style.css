@@ -113,3 +113,8 @@ button,select,input{font:inherit;color:inherit}
 .seg button{flex:1;border:0;background:transparent;color:var(--ink);padding:8px;border-radius:9px;cursor:pointer}
 .seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.15);font-weight:700}
 .tabs button{font-size:13px;padding:8px 2px}
+/* 一括判定・地図保存 */
+#bq{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--card);font-size:15px;margin-bottom:8px;resize:vertical}
+.btab{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}.btab td{border-bottom:1px solid var(--line);padding:6px 4px;vertical-align:top}.btab tr{cursor:pointer}.btab .s{color:var(--sub);font-size:11px}
+#mapBar{height:100%;width:0;background:var(--pri)}
+.area{display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0;font-size:13px}.area .an{flex:1;min-width:0}

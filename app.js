@@ -342,6 +342,88 @@
   $('#drawer').addEventListener('click', e => { if (e.target.id === 'drawer') $('#drawer').classList.add('hidden'); });
   document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('hidden', t.id !== 't-' + b.dataset.t)); });
   $('#btnDl').onclick = downloadAll;
+
+  // ---- 地図の保存（見ている範囲の背景地図を端末へ）----
+  const TILE_CACHE = 'rosen-tile-v1', MAXT = 2500;
+  const tileUrls = (b, z0, z1) => {
+    const out = [];
+    for (let z = z0; z <= z1; z++) {
+      const n = 2 ** z, tx = g => Math.floor((g + 180) / 360 * n), ty = t => Math.floor((1 - Math.log(Math.tan(t * Math.PI / 180) + 1 / Math.cos(t * Math.PI / 180)) / Math.PI) / 2 * n);
+      for (let x = tx(b[0]); x <= tx(b[2]); x++) for (let y = ty(b[3]); y <= ty(b[1]); y++) out.push(`https://cyberjapandata.gsi.go.jp/xyz/pale/${z}/${x}/${y}.png`);
+    }
+    return out;
+  };
+  const areas = () => store.get('areas', []);
+  async function renderAreas() {
+    const A = areas();
+    let s = A.length ? '<h4>保存した地図</h4>' + A.map((x, i) => `<div class="area"><div class="an"><b>${esc(x.name)}</b><div class="muted">${new Date(x.t).toLocaleDateString('ja-JP')}・${x.n}枚</div></div><button class="plain" data-ago="${i}">表示</button><button class="plain" data-adel="${i}">削除</button></div>`).join('') : '';
+    try { const e = await navigator.storage.estimate(); s += `<p class="muted">この端末で使っている容量：約${Math.round(e.usage / 1e6)}MB</p>`; } catch (e) { }
+    $('#areas').innerHTML = s;
+  }
+  $('#areas').addEventListener('click', async e => {
+    const g = e.target.closest('[data-ago]'), d = e.target.closest('[data-adel]');
+    if (g) { const x = areas()[+g.dataset.ago]; $('#drawer').classList.add('hidden'); map.fitBounds([[x.b[1], x.b[0]], [x.b[3], x.b[2]]]); }
+    if (d) {
+      const A = areas(), x = A[+d.dataset.adel]; A.splice(+d.dataset.adel, 1); store.set('areas', A);
+      try { const c = await caches.open(TILE_CACHE); await Promise.all(tileUrls(x.b, x.z0, x.z1).map(u => c.delete(u))); } catch (err) { }
+      renderAreas(); toast('保存した地図を削除しました');
+    }
+  });
+  $('#btnMapSave').onclick = async () => {
+    // 見えている範囲（狭いときは中心から約1km四方まで広げる）
+    const B = map.getBounds(), ct = map.getCenter();
+    const b = [Math.min(B.getWest(), ct.lng - 0.011), Math.min(B.getSouth(), ct.lat - 0.009), Math.max(B.getEast(), ct.lng + 0.011), Math.max(B.getNorth(), ct.lat + 0.009)];
+    const z0 = Math.max(10, Math.min(map.getZoom() - 2, 14)); let z1 = 18, urls = tileUrls(b, z0, z1);
+    while (urls.length > MAXT && z1 > z0 + 1) { z1--; urls = tileUrls(b, z0, z1); }
+    if (urls.length > MAXT || map.getZoom() < 11) { toast('範囲が広すぎます。もう少し地図を拡大してから保存してください'); return; }
+    $('#btnMapSave').disabled = true;
+    const c = await caches.open(TILE_CACHE), q = [...urls]; let done = 0, ng = 0;
+    const worker = async () => { while (q.length) { const u = q.shift(); try { if (!(await c.match(u))) { const r = await fetch(u); if (r.ok) await c.put(u, r); else ng++; } } catch (e) { ng++; } done++; if (done % 10 === 0 || done === urls.length) { $('#mapBar').style.width = (done / urls.length * 100) + '%'; $('#mapMsg').textContent = `${done} / ${urls.length}`; } } };
+    await Promise.all([1, 2, 3, 4, 5, 6].map(worker));
+    const ctr = map.getCenter(), nm = await nearAddr([ctr.lng, ctr.lat]);
+    const A = areas(); A.unshift({ name: (nm || '保存した範囲') + ' 周辺', b, z0, z1, n: urls.length - ng, t: Date.now() }); store.set('areas', A.slice(0, 30));
+    $('#mapMsg').textContent = ng ? `保存しました（${ng}枚は取得できませんでした。電波の良い所でもう一度押すと補えます）` : '保存しました。電波がなくてもこの範囲の地図が見られます。';
+    $('#btnMapSave').disabled = false; renderAreas();
+  };
+  renderAreas();
+
+  // ---- まとめて判定 ----
+  let BATCH = [];
+  function renderBatch() {
+    $('#bres').innerHTML = BATCH.length ? '<table class="btab">' + BATCH.map((x, i) => `<tr data-bi="${i}"><td>${x.v ? `<span class="badge ${x.v}">${vLabel[x.v]}</span>` : '<span class="badge">―</span>'}</td><td><div>${esc(x.q)}</div><div class="s">${esc(x.sum || x.near || x.title || '')}</div></td></tr>`).join('') + '</table>' : '';
+  }
+  $('#bres').addEventListener('click', e => {
+    const tr = e.target.closest('[data-bi]'); if (!tr) return; const x = BATCH[+tr.dataset.bi]; if (!x.pt) return;
+    $('#drawer').classList.add('hidden'); run(x.pt, x.title, x.level);
+  });
+  $('#btnBatch').onclick = async () => {
+    const L = $('#bq').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (!L.length) { toast('住所を1行に1つずつ入れてください'); return; }
+    if (L.length > 100) toast('一度に判定できるのは100件までです（先頭100件を判定します）');
+    const lines = L.slice(0, 100), th = +$('#th').value; BATCH = []; renderBatch();
+    $('#btnBatch').disabled = true; $('#btnCsv').classList.add('hidden');
+    for (let i = 0; i < lines.length; i++) {
+      $('#bMsg').textContent = `判定中… ${i + 1} / ${lines.length}`;
+      let g = null; try { g = await geocode(lines[i]); } catch (e) { }
+      if (!g) { BATCH.push({ q: lines[i], title: '住所が見つかりません' }); renderBatch(); continue; }
+      try {
+        const r = C.judge([g.lng, g.lat], await loadAround(g.lng, g.lat), { th, mw: showMw });
+        BATCH.push({ q: lines[i], title: g.title, pt: [g.lng, g.lat], level: g.level, v: r.verdict,
+          sum: r.hits.map(h => `${h.route.name}（${h.dirs.join('・') || '直上'}）`).join('、'),
+          near: r.near[0] ? `近くの路線：${r.near[0].route.name} 約${Math.round(r.near[0].d)}m` : '' });
+      } catch (e) { BATCH.push({ q: lines[i], title: e.message }); }
+      renderBatch();
+    }
+    $('#bMsg').textContent = `${lines.length}件を判定しました。行をタップすると地図で確認できます。`;
+    $('#btnBatch').disabled = false; $('#btnCsv').classList.remove('hidden');
+  };
+  $('#btnCsv').onclick = () => {
+    const q = s => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+    const rows = [['入力した住所', '判定', '該当路線（面している方角）', '近くの路線', '判定に使った地点', '緯度', '経度'],
+      ...BATCH.map(x => [x.q, x.v ? vLabel[x.v] : '判定できず', x.sum || '', x.near || '', x.title || '', x.pt ? x.pt[1].toFixed(6) : '', x.pt ? x.pt[0].toFixed(6) : ''])];
+    const blob = new Blob(['﻿' + rows.map(r => r.map(q).join(',')).join('\r\n')], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `指定路線判定_${new Date().toISOString().slice(0, 10)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
   $('#chkMw').onchange = () => { showMw = $('#chkMw').checked; showMw ? mwLayer.addTo(map) : mwLayer.remove(); if (last) run(last.pt, last.title, last.level); };
   init().catch(e => toast('初期化エラー: ' + e.message, 6000));
 })();

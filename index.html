@@ -50,7 +50,7 @@
 <div id="drawer" class="drawer hidden">
   <div class="drawer-in">
     <div class="drawer-h"><b>メニュー</b><button id="btnClose" class="ghost">✕</button></div>
-    <div class="tabs"><button data-t="hist" class="on">履歴</button><button data-t="list">路線</button><button data-t="set">設定</button><button data-t="offline">保存</button><button data-t="about">情報</button></div>
+    <div class="tabs"><button data-t="hist" class="on">履歴</button><button data-t="list">路線</button><button data-t="set">設定</button><button data-t="offline">保存</button><button data-t="batch">一括</button><button data-t="about">情報</button></div>
     <div id="t-hist" class="tab"></div>
     <div id="t-list" class="tab hidden"></div>
     <div id="t-set" class="tab hidden">
@@ -66,7 +66,21 @@
       <p>全エリアの路線・建物データ（約42MB）を端末に保存すると、電波がなくても判定できます。</p>
       <button id="btnDl" class="primary wide">オフライン用データを保存</button>
       <div class="bar"><div id="dlBar"></div></div><p id="dlMsg" class="muted"></p>
-      <p class="muted">※背景地図は表示したエリアだけ自動保存されます。オフライン時の住所検索は町丁目レベルです（建物は地図タップで選択）。</p>
+      <p class="muted">※オフライン時の住所検索は町丁目レベルです（建物は地図タップで選択）。</p>
+      <h4>地図の保存</h4>
+      <p class="muted">電波の悪い現場に行く前に、その辺りを地図に表示してから押してください。いま見えている範囲（狭いときは周り約1km）の背景地図を端末に保存します。</p>
+      <button id="btnMapSave" class="primary wide">今見ている範囲の地図を保存</button>
+      <div class="bar"><div id="mapBar"></div></div><p id="mapMsg" class="muted"></p>
+      <div id="areas"></div>
+    </div>
+    <div id="t-batch" class="tab hidden">
+      <h4>まとめて判定</h4>
+      <p class="muted">住所を1行に1つずつ貼り付けると、まとめて判定して一覧にします。CSV（エクセルで開ける形式）で保存もできます。見積もりや複数現場の確認にどうぞ。</p>
+      <textarea id="bq" rows="6" placeholder="例）&#10;大阪市北区梅田1-1&#10;天理市川原城町&#10;京都市中京区河原町通三条"></textarea>
+      <button id="btnBatch" class="primary wide">まとめて判定する</button>
+      <p id="bMsg" class="muted"></p>
+      <div id="bres"></div>
+      <button id="btnCsv" class="plain hidden">CSVで保存</button>
     </div>
     <div id="t-about" class="tab hidden">
       <h4>判定のしかた</h4>
