@@ -93,15 +93,19 @@
 
   // ---- データ読み込み ----
   const bundleOf = k => { const [x, y] = k.split('_').map(Number), n = C.meta().bundle; return `${Math.floor(x / n)}_${Math.floor(y / n)}`; };
-  function getBundle(bk) {
-    if (!bundleCache.has(bk)) bundleCache.set(bk, fetch(`data/b/${bk}.json`).then(r => { if (!r.ok) throw 0; return r.json(); }).catch(e => { bundleCache.delete(bk); throw new Error('データを読み込めません（オフライン時は「保存」タブでデータを保存してください）'); }));
-    return bundleCache.get(bk);
+  function getBundle(bk, dir = 'b') {
+    const ck = dir + '/' + bk;
+    if (!bundleCache.has(ck)) bundleCache.set(ck, fetch(`data/${dir}/${bk}.json`).then(r => { if (!r.ok) throw 0; return r.json(); }).catch(e => { bundleCache.delete(ck); throw new Error('データを読み込めません（オフライン時は「保存」タブでデータを保存してください）'); }));
+    return bundleCache.get(ck);
   }
   async function getCell(k) {
     if (cellCache.has(k)) return cellCache.get(k);
     if (!C.meta().cells.includes(k)) return { roads: [], blds: [] };
-    const p = Promise.all([getBundle(bundleOf(k)), PATCH]).then(([b, pt]) => {
+    const wb = C.meta().wb || [], bk = bundleOf(k);
+    const p = Promise.all([getBundle(bk), PATCH, wb.includes(bk) ? getBundle(bk, 'w').catch(() => null) : null]).then(([b, pt, w]) => {
       let raw = b[k];
+      // 路線の線と道路幅は data/w を優先（無ければ data/b の線）
+      if (w) { const wc = w[k]; raw = { r: wc ? wc.r : [], w: wc ? wc.w : null, b: raw ? raw.b : [] }; }
       if (pt[k]) raw = { r: pt[k].r, b: [...(raw ? raw.b : []), ...pt[k]['b+']] };
       return raw ? C.decode(k, raw) : { roads: [], blds: [] };
     });
@@ -312,11 +316,11 @@
   }
 
   async function downloadAll() {
-    const keys = C.meta().bundles; let done = 0; $('#btnDl').disabled = true;
+    const keys = [...C.meta().bundles.map(k => 'b/' + k), ...(C.meta().wb || []).map(k => 'w/' + k)]; let done = 0; $('#btnDl').disabled = true;
     const cache = await caches.open('rosen-data-v2');
     try { await cache.add('data/addr.json'); await cache.add('data/patch.json'); } catch (e) { }
     const q = [...keys];
-    const worker = async () => { while (q.length) { const k = q.shift(); try { await cache.add(`data/b/${k}.json`); } catch (e) { } done++; $('#dlBar').style.width = (done / keys.length * 100) + '%'; $('#dlMsg').textContent = `${done} / ${keys.length}`; } };
+    const worker = async () => { while (q.length) { const k = q.shift(); try { await cache.add(`data/${k}.json`); } catch (e) { } done++; $('#dlBar').style.width = (done / keys.length * 100) + '%'; $('#dlMsg').textContent = `${done} / ${keys.length}`; } };
     await Promise.all([1, 2, 3, 4, 5, 6].map(worker));
     $('#dlMsg').textContent = '保存しました。電波がなくても判定できます。'; $('#btnDl').disabled = false;
   }

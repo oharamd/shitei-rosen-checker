@@ -15,7 +15,7 @@
   C.decode = (key, raw) => {
     const [ix, iy] = key.split('_').map(Number), ox = ix * META.cell, oy = iy * META.cell, q = META.q;
     const dec = (a, s) => { const p = []; let x = 0, y = 0; for (let i = s; i < a.length; i += 2) { x += a[i]; y += a[i + 1]; p.push([ox + x / q, oy + y / q]); } return p; };
-    return { roads: raw.r.map(a => ({ ri: a[0], pts: dec(a, 1) })), blds: raw.b.map(a => dec(a, 0)) };
+    return { roads: raw.r.map((a, i) => ({ ri: a[0], pts: dec(a, 1), w: raw.w && raw.w[i] ? raw.w[i] : null })), blds: (raw.b || []).map(a => dec(a, 0)) };
   };
   // 平面近似（m）
   const proj = (lng0, lat0) => { const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574; return { f: ([x, y]) => [(x - lng0) * kx, (y - lat0) * ky], inv: ([x, y]) => [x / kx + lng0, y / ky + lat0] }; };
@@ -80,7 +80,9 @@
     };
     const cand = new Map(), nears = new Map();
     for (const rd of data.roads) {
-      const r = routes[rd.ri], lim = th + halfW(r), xy = rd.pts.map(P.f);
+      const r = routes[rd.ri], W = rd.w, lim = th + (W ? Math.max(...W) / 2 : halfW(r)), xy = rd.pts.map(P.f);
+      // 実測の道路幅（左右別・歩道込み）。無い所は道路の種類ごとの目安
+      const hwAt = (i, a, b, p) => { if (!W) return halfW(r); const j = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) >= 0 ? 0 : 1; return (W[2 * i + j] + W[2 * i + 2 + j]) / 4; };
       for (let i = 0; i < xy.length - 1; i++) {
         const a = xy[i], b = xy[i + 1];
         const c0 = near(p0, a, b), d0 = dist(p0, c0);
@@ -88,15 +90,15 @@
         const nn = nears.get(rd.ri); if (!nn || d0 < nn.d) nears.set(rd.ri, { d: d0, pt: P.inv(c0) });
         if (d0 > R + lim || (r.id === 'MW' && !opt.mw)) continue;
         for (const s of samples) {
-          const c = near(s.p, a, b), d = dist(s.p, c);
-          if (d > lim) continue;
+          const c = near(s.p, a, b), d = dist(s.p, c), hw = hwAt(i, a, b, s.p);
+          if (d > th + hw) continue;
           let o;
           if (s.n) {
             if (d > 0.5) { const vx = (c[0] - s.p[0]) / d, vy = (c[1] - s.p[1]) / d; if (vx * s.n[0] + vy * s.n[1] < 0.35) continue; }
             o = octant(s.n[0], s.n[1]);
           } else o = d > 0.5 ? octant(c[0] - s.p[0], c[1] - s.p[1]) : 0;
           const k = rd.ri + ':' + o; let L = cand.get(k); if (!L) cand.set(k, L = []);
-          L.push({ ri: rd.ri, o, d, sp: s.p, c, edge: Math.max(0, d - halfW(r)) });
+          L.push({ ri: rd.ri, o, d, sp: s.p, c, hw, edge: Math.max(0, d - hw) });
         }
       }
     }
@@ -107,7 +109,7 @@
       for (let i = 0; i < L.length; i += (i < 10 ? 1 : step)) {
         const c = L[i];
         // 道路端の手前までの線で遮りを確認（中央分離帯の建物等は無視）
-        const t = c.d > 0.5 ? Math.max(0, (c.d - halfW(routes[c.ri])) / c.d) : 0;
+        const t = c.d > 0.5 ? Math.max(0, (c.d - c.hw) / c.d) : 0;
         const q = [c.sp[0] + (c.c[0] - c.sp[0]) * t, c.sp[1] + (c.c[1] - c.sp[1]) * t];
         if (t > 0 && cross(c.sp, q)) continue;
         let h = hits.get(c.ri); if (!h) { h = { ri: c.ri, sides: {}, dmin: Infinity, emin: Infinity }; hits.set(c.ri, h); }
