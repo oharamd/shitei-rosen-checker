@@ -94,8 +94,8 @@
 
   const compass = idx => {
     const s = new Set(idx); let p = '';
-    for (let i = 0; i < 8; i++) {
-      const a0 = (i * 45 - 22.5 - 90) * Math.PI / 180, a1 = (i * 45 + 22.5 - 90) * Math.PI / 180;
+    for (let i = 0; i < 4; i++) {
+      const a0 = (i * 90 - 45 - 90) * Math.PI / 180, a1 = (i * 90 + 45 - 90) * Math.PI / 180;
       p += `<path d="M26 26 L${26 + 24 * Math.cos(a0)} ${26 + 24 * Math.sin(a0)} A24 24 0 0 1 ${26 + 24 * Math.cos(a1)} ${26 + 24 * Math.sin(a1)}Z" fill="${s.has(i) ? '#dc2626' : 'rgba(148,163,184,.22)'}" stroke="var(--card)" stroke-width="1.5"/>`;
     }
     return `<svg class="compass" viewBox="0 0 52 52">${p}<rect x="19" y="19" width="14" height="14" rx="3" fill="#2563eb"/><text x="26" y="9" font-size="7.5" text-anchor="middle" fill="#64748b" font-weight="800">北</text></svg>`;

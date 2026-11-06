@@ -2,7 +2,7 @@
 (function (root) {
   const C = {};
   let META = null;
-  const DIRS = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
+  const DIRS = ['北', '東', '南', '西'];
   C.DIRS = DIRS;
   C.setMeta = m => { META = m; };
   C.meta = () => META;
@@ -23,7 +23,7 @@
   const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   const pip = (p, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
   const area = poly => { let s = 0; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; };
-  const octant = (vx, vy) => { let ang = Math.atan2(vx, vy) * 180 / Math.PI; if (ang < 0) ang += 360; return Math.round(ang / 45) % 8; };
+  const octant = (vx, vy) => { let ang = Math.atan2(vx, vy) * 180 / Math.PI; if (ang < 0) ang += 360; return Math.round(ang / 90) % 4; };
   C.octant = octant;
 
   /** pt=[lng,lat], data={roads,blds}, opt={th:30, building:true} */
@@ -122,7 +122,7 @@
       if (r.note && !r.group) warn = r.note;
       if (r.ends && r.ends.length) {
         const Q = proj(h.to[0], h.to[1]);
-        for (const e of r.ends) { if (dist([0, 0], Q.f(e.pt)) < 400) { warn = '区間の始点・終点付近です（告示の区間を要確認）'; break; } }
+        for (const e of r.ends) { if (dist([0, 0], Q.f(e.pt)) < Math.max(80, (e.d || 0) + 60)) { warn = '区間の始点・終点付近です（告示の区間を要確認）'; break; } }
       }
       const sideIdx = Object.keys(h.sides).map(Number).sort((a, b) => a - b);
       return { ...h, route: r, warn, dirs: sideIdx.map(i => DIRS[i]), sideIdx };
