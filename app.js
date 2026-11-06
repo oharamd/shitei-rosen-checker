@@ -64,12 +64,13 @@
     map = L.map('map', { zoomControl: false, attributionControl: true }).setView([34.69, 135.5], 11);
     L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', { maxZoom: 19, maxNativeZoom: 18, attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a> | © OpenStreetMap contributors' }).addTo(map);
     roadLayer = L.layerGroup().addTo(map); mwLayer = L.layerGroup(); layer = L.layerGroup().addTo(map);
-    map.on('click', e => run([e.latlng.lng, e.latlng.lat], '地図で選択した地点'));
+    map.on('click', async e => { const pt = [e.latlng.lng, e.latlng.lat]; const a = await nearAddr(pt); run(pt, a ? a + ' 付近' : '地図で選択した地点'); });
     map.on('moveend', drawRoads);
     buildList(meta);
     drawRoads();
     sheetH();
     showNotice(meta);
+    fixOldHist();
   }
 
   // ---- データ更新のお知らせ ----
@@ -135,6 +136,24 @@
     return (j || []).slice(0, n).map(x => ({ lng: x.geometry.coordinates[0], lat: x.geometry.coordinates[1], title: x.properties.title, level: '住所' }));
   }
   async function loadAddr() { if (!ADDR) ADDR = await (await fetch('data/addr.json')).json(); return ADDR; }
+  // 座標 → いちばん近い町名（オフラインで動く・3km以内）
+  async function nearAddr(pt) {
+    try {
+      const A = await loadAddr(), cl = Math.cos(pt[1] * Math.PI / 180);
+      let best = null, bd = Infinity;
+      for (const p in A) for (const c in A[p]) for (const t in A[p][c]) {
+        const v = A[p][c][t], dx = (v[1] - pt[0]) * cl, dy = v[0] - pt[1], d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = c + t; }
+      }
+      return best && Math.sqrt(bd) * 111 < 3 ? best : null;
+    } catch (e) { return null; }
+  }
+  // 以前の「地図で選択した地点」の履歴にも住所を付ける
+  async function fixOldHist() {
+    const h = hist(); let n = 0;
+    for (const x of h) if (x.title === '地図で選択した地点') { const a = await nearAddr(x.pt); if (a) { x.title = a + ' 付近'; n++; } }
+    if (n) { store.set('hist', h); renderHist(); }
+  }
   async function geocode(q) {
     if (navigator.onLine) { try { const r = await gsiSearch(q, 1); if (r[0]) return r[0]; } catch (e) { } }
     return C.offlineGeocode(q, await loadAddr());
@@ -311,7 +330,7 @@
   $('#btnGps').addEventListener('click', () => {
     if (!navigator.geolocation) return toast('位置情報が使えません');
     toast('現在地を取得中…');
-    navigator.geolocation.getCurrentPosition(p => run([p.coords.longitude, p.coords.latitude], `現在地（誤差 約${Math.round(p.coords.accuracy)}m）`), () => toast('現在地を取得できませんでした'), { enableHighAccuracy: true, timeout: 15000 });
+    navigator.geolocation.getCurrentPosition(async p => { const pt = [p.coords.longitude, p.coords.latitude]; const a = await nearAddr(pt); run(pt, `${a ? a + ' 付近' : '現在地'}（現在地・誤差 約${Math.round(p.coords.accuracy)}m）`); }, () => toast('現在地を取得できませんでした'), { enableHighAccuracy: true, timeout: 15000 });
   });
   $('#th').addEventListener('change', () => { if (last) run(last.pt, last.title, last.level); });
   $('#btnMenu').onclick = () => { renderHist(); $('#drawer').classList.remove('hidden'); };
